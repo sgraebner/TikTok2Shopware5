@@ -1,23 +1,5 @@
-# Environment file with sensitive credentials
-.env
-
-# SQLite database file
-queue.db
-
-# Log files
-*.log
-
-# Supervisor logs
-worker.out.log
-worker.err.log
-monitor.out.log
-monitor.err.log
-
-# IDE and editor files
-.idea/
-.vscode/
-*.swp
-
-# Composer or other dependency files (if added later)
-vendor/
-composer.lock
+/vendor
+/.env
+/src/Logs/*
+/var/logs/*
+/var/queue/*
