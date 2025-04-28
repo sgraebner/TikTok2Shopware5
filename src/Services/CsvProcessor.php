@@ -56,6 +56,9 @@ class CsvProcessor
         $firstItem = $items[0];
         [$firstName, $lastName] = $this->splitName($firstItem['Recipient']);
 
+        // Process street address and house number
+        $streetAddress = $this->processStreetAddress($firstItem['Street Name'], $firstItem['House Name or Number']);
+
         $orderDetails = [];
         $total = 0;
         foreach ($items as $item) {
@@ -110,7 +113,7 @@ class CsvProcessor
             'billing' => [
                 'firstName' => $firstName,
                 'lastName' => $lastName,
-                'street' => $firstItem['Street Name'],
+                'street' => $streetAddress,
                 'zipCode' => $firstItem['Zipcode'],
                 'city' => $firstItem['City'],
                 'countryId' => 2, // Germany, adjust as needed
@@ -118,7 +121,7 @@ class CsvProcessor
             'shipping' => [
                 'firstName' => $firstName,
                 'lastName' => $lastName,
-                'street' => $firstItem['Street Name'],
+                'street' => $streetAddress,
                 'zipCode' => $firstItem['Zipcode'],
                 'city' => $firstItem['City'],
                 'countryId' => 2,
@@ -140,5 +143,38 @@ class CsvProcessor
         $lastName = array_pop($parts);
         $firstName = implode(' ', $parts);
         return [$firstName ?: 'Unknown', $lastName ?: 'Unknown'];
+    }
+
+    private function processStreetAddress(string $streetName, string $houseNameOrNumber): string
+    {
+        // Step 1: Check if the street name contains a house number in parentheses (e.g., "Siechenhaustraße(11)")
+        if (preg_match('/^(.*?)\((\d+[a-zA-Z]?)\)$/', $streetName, $matches)) {
+            $cleanStreet = trim($matches[1]); // "Siechenhaustraße"
+            $houseNumber = $matches[2]; // "11"
+        } else {
+            // Step 2: If no parentheses, check if the street name already contains a number at the end (e.g., "Westerwaldstraße 139")
+            $parts = explode(' ', trim($streetName));
+            $lastPart = end($parts);
+            if (preg_match('/^\d+[a-zA-Z]?$/', $lastPart)) {
+                $houseNumber = $lastPart;
+                $cleanStreet = implode(' ', array_slice($parts, 0, -1));
+            } else {
+                // Step 3: Use the street name as-is and look for the house number in the "House Name or Number" field
+                $cleanStreet = trim($streetName);
+                $houseNumber = null;
+
+                // Step 4: Check "House Name or Number" for a valid house number
+                $houseParts = trim($houseNameOrNumber);
+                if (preg_match('/^\d+[a-zA-Z]?$/', $houseParts)) {
+                    $houseNumber = $houseParts;
+                } elseif ($houseParts && !preg_match('/^(c\/o|wohnung)/i', $houseParts)) {
+                    // If "House Name or Number" contains data but isn't a number or a "c/o" or "wohnung", log a warning
+                    $this->logger->warning("Unrecognized house number format: $houseParts");
+                }
+            }
+        }
+
+        // Step 5: Combine the street and house number (if found)
+        return $houseNumber ? "$cleanStreet $houseNumber" : $cleanStreet;
     }
 }
